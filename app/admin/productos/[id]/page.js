@@ -8,27 +8,17 @@ import {
   actualizarProducto,
   subirImagenesProducto,
   eliminarImagenProducto,
+  subirVideosProducto,
+  eliminarVideoProducto,
   venderTalla,
 } from "../../../../lib/api";
 import { obtenerToken } from "../../../../lib/auth";
+import { CATEGORIAS } from "../../../../lib/categorias";
 
-const marcas = [
-  "Joma",
-  "Nike",
-  "Adidas",
-  "Puma",
-  "Lacoste",
-  "Punto Original",
-  "CRforward",
-  "VD-Dariems",
-  "New Athletic",
-  "Michelin",
-  "Underarmour",
-  "Nacionales (Marcelo)",
-  "Ni Air Running",
-];
+const MAX_VIDEOS = 3;
+const MAX_VIDEO_MB = 50;
 
-const MARCA_CON_REPLICA = "Nacionales (Marcelo)";
+const formatearTamano = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 const aInputDatetime = (fecha) => {
   if (!fecha) return "";
@@ -43,16 +33,13 @@ export default function EditarProductoPage() {
 
   const [form, setForm] = useState({
     codigo: "",
-    sucursal: "sucursal1",
     nombre: "",
     modeloBase: "",
-    marca: "Nike",
-    calidad: "Original",
     descripcion: "",
     precio: "",
-    categoria: "hombre",
-    tipo: "casual",
+    categoria: CATEGORIAS[0].slug,
     colores: "",
+    personalizable: false,
     destacado: false,
     activo: true,
     precioOferta: "",
@@ -64,6 +51,11 @@ export default function EditarProductoPage() {
   const [imagenesActuales, setImagenesActuales] = useState([]);
   const [nuevasImagenes, setNuevasImagenes] = useState([]);
   const [eliminandoImagen, setEliminandoImagen] = useState(null);
+  const [videosActuales, setVideosActuales] = useState([]);
+  const [nuevosVideos, setNuevosVideos] = useState([]);
+  const [eliminandoVideo, setEliminandoVideo] = useState(null);
+  const [claveInputVideos, setClaveInputVideos] = useState(0);
+  const [etapa, setEtapa] = useState("");
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
@@ -74,15 +66,12 @@ export default function EditarProductoPage() {
       const producto = await obtenerProductoPorId(id);
       setForm({
         codigo: producto.codigo || "",
-        sucursal: producto.sucursal || "sucursal1",
         nombre: producto.nombre,
         modeloBase: producto.modeloBase || "",
-        marca: producto.marca && marcas.includes(producto.marca) ? producto.marca : "Nike",
-        calidad: producto.calidad || "Original",
         descripcion: producto.descripcion || "",
         precio: producto.precio,
         categoria: producto.categoria,
-        tipo: producto.tipo,
+        personalizable: producto.personalizable === true,
         colores: (producto.colores || []).join(", "),
         destacado: producto.destacado,
         activo: producto.activo,
@@ -96,6 +85,7 @@ export default function EditarProductoPage() {
           : [{ talla: "", stock: "" }]
       );
       setImagenesActuales(producto.imagenes || []);
+      setVideosActuales(producto.videos || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -109,14 +99,6 @@ export default function EditarProductoPage() {
 
   const manejarCambio = (e) => {
     const { name, value, type, checked } = e.target;
-    if (name === "marca") {
-      setForm((prev) => ({
-        ...prev,
-        marca: value,
-        calidad: value === MARCA_CON_REPLICA ? prev.calidad : "Original",
-      }));
-      return;
-    }
     setForm({ ...form, [name]: type === "checkbox" ? checked : value });
   };
 
@@ -150,6 +132,44 @@ export default function EditarProductoPage() {
     }
   };
 
+  const manejarEliminarVideo = async (url) => {
+    const confirmar = window.confirm("¿Eliminar este video?");
+    if (!confirmar) return;
+
+    setEliminandoVideo(url);
+    try {
+      const token = obtenerToken();
+      await eliminarVideoProducto(token, id, url);
+      setVideosActuales(videosActuales.filter((v) => v !== url));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setEliminandoVideo(null);
+    }
+  };
+
+  const manejarVideos = (e) => {
+    const elegidos = Array.from(e.target.files);
+    setError("");
+
+    if (videosActuales.length + elegidos.length > MAX_VIDEOS) {
+      setError(`Cada producto puede tener hasta ${MAX_VIDEOS} videos (ya tiene ${videosActuales.length}).`);
+      setClaveInputVideos((c) => c + 1);
+      setNuevosVideos([]);
+      return;
+    }
+
+    const muyPesado = elegidos.find((v) => v.size > MAX_VIDEO_MB * 1024 * 1024);
+    if (muyPesado) {
+      setError(`"${muyPesado.name}" pesa ${formatearTamano(muyPesado.size)}. Cada video puede pesar hasta ${MAX_VIDEO_MB} MB.`);
+      setClaveInputVideos((c) => c + 1);
+      setNuevosVideos([]);
+      return;
+    }
+
+    setNuevosVideos(elegidos);
+  };
+
   const manejarSubmit = async (e) => {
     e.preventDefault();
     setMensaje("");
@@ -165,15 +185,12 @@ export default function EditarProductoPage() {
 
       const payload = {
         codigo: form.codigo.trim(),
-        sucursal: form.sucursal,
         nombre: form.nombre,
         modeloBase: form.modeloBase.trim(),
-        marca: form.marca,
-        calidad: form.marca === MARCA_CON_REPLICA ? form.calidad : "Original",
         descripcion: form.descripcion,
         precio: Number(form.precio),
         categoria: form.categoria,
-        tipo: form.tipo,
+        personalizable: form.personalizable,
         colores: form.colores
           .split(",")
           .map((c) => c.trim())
@@ -189,8 +206,17 @@ export default function EditarProductoPage() {
       await actualizarProducto(token, id, payload);
 
       if (nuevasImagenes.length > 0) {
+        setEtapa("Subiendo imágenes...");
         const resultado = await subirImagenesProducto(token, id, nuevasImagenes);
         setImagenesActuales(resultado.imagenes || imagenesActuales);
+      }
+
+      if (nuevosVideos.length > 0) {
+        setEtapa("Subiendo videos (puede tardar un poco)...");
+        const resultado = await subirVideosProducto(token, id, nuevosVideos);
+        setVideosActuales(resultado.videos || videosActuales);
+        setNuevosVideos([]);
+        setClaveInputVideos((c) => c + 1);
       }
 
       setMensaje("Producto actualizado correctamente");
@@ -198,6 +224,7 @@ export default function EditarProductoPage() {
     } catch (err) {
       setError(err.message);
     } finally {
+      setEtapa("");
       setGuardando(false);
     }
   };
@@ -214,7 +241,7 @@ export default function EditarProductoPage() {
       await venderTalla(token, id, talla, cantidad);
       setCantidadesVenta({ ...cantidadesVenta, [talla]: "" });
       await cargar();
-      setMensaje(`Venta registrada: ${cantidad} unidad(es) de talla ${talla}`);
+      setMensaje(`Venta registrada: ${cantidad} unidad(es) de ${talla}`);
     } catch (err) {
       alert(err.message);
     }
@@ -239,24 +266,13 @@ export default function EditarProductoPage() {
           </div>
 
           <form onSubmit={manejarSubmit} className="flex flex-col gap-4">
-            <div className="flex gap-3">
-              <input
-                name="codigo"
-                placeholder="Codigo / numero del par"
-                value={form.codigo}
-                onChange={manejarCambio}
-                className="border border-gray-300 rounded px-3 py-2 flex-1 bg-white text-gray-900"
-              />
-              <select
-                name="sucursal"
-                value={form.sucursal}
-                onChange={manejarCambio}
-                className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
-              >
-                <option value="sucursal1">Sucursal 1</option>
-                <option value="sucursal2">Sucursal 2</option>
-              </select>
-            </div>
+            <input
+              name="codigo"
+              placeholder="Código (opcional)"
+              value={form.codigo}
+              onChange={manejarCambio}
+              className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+            />
 
             <input
               name="nombre"
@@ -268,46 +284,15 @@ export default function EditarProductoPage() {
             />
             <input
               name="modeloBase"
-              placeholder="Modelo base (para agrupar variantes)"
+              placeholder="Modelo base (opcional, para agrupar versiones)"
               value={form.modeloBase}
               onChange={manejarCambio}
               className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
             />
 
-            <div className="flex gap-3">
-              <select
-                name="marca"
-                value={form.marca}
-                onChange={manejarCambio}
-                className="border border-gray-300 rounded px-3 py-2 flex-1 bg-white text-gray-900"
-                required
-              >
-                {marcas.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-
-              <select
-                name="calidad"
-                value={form.calidad}
-                onChange={manejarCambio}
-                disabled={form.marca !== MARCA_CON_REPLICA}
-                className={`border border-gray-300 rounded px-3 py-2 flex-1 bg-white text-gray-900 ${form.marca !== MARCA_CON_REPLICA ? "opacity-50 cursor-not-allowed" : ""}`}
-                required
-              >
-                <option value="Original">Original</option>
-                <option value="Replica">Replica</option>
-              </select>
-            </div>
-            {form.marca !== MARCA_CON_REPLICA && (
-              <p className="text-xs text-gray-400 -mt-2">
-                Solo los productos de "Nacionales (Marcelo)" pueden marcarse como Replica.
-              </p>
-            )}
-
             <textarea
               name="descripcion"
-              placeholder="Descripcion"
+              placeholder="Descripción (qué incluye: caja, tarjeta, fotos...)"
               value={form.descripcion}
               onChange={manejarCambio}
               className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
@@ -323,31 +308,18 @@ export default function EditarProductoPage() {
               required
             />
 
-            <div className="flex gap-4">
-              <select
-                name="categoria"
-                value={form.categoria}
-                onChange={manejarCambio}
-                className="border border-gray-300 rounded px-3 py-2 flex-1 bg-white text-gray-900"
-              >
-                <option value="hombre">Hombre</option>
-                <option value="mujer">Mujer</option>
-                <option value="ninios">{"Ni\u00f1os"}</option>
-              </select>
-
-              <select
-                name="tipo"
-                value={form.tipo}
-                onChange={manejarCambio}
-                className="border border-gray-300 rounded px-3 py-2 flex-1 bg-white text-gray-900"
-              >
-                <option value="running">Running</option>
-                <option value="urbano">Urbano</option>
-                <option value="casual">Casual</option>
-                <option value="deportivo">Deportivo</option>
-                <option value="botines">Botines</option>
-              </select>
-            </div>
+            <select
+              name="categoria"
+              value={form.categoria}
+              onChange={manejarCambio}
+              className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+            >
+              {CATEGORIAS.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
 
             <input
               name="colores"
@@ -357,7 +329,7 @@ export default function EditarProductoPage() {
               className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
             />
 
-            <div className="flex gap-6">
+            <div className="flex gap-6 flex-wrap">
               <label className="flex items-center gap-2 text-sm text-gray-900">
                 <input
                   type="checkbox"
@@ -365,7 +337,16 @@ export default function EditarProductoPage() {
                   checked={form.destacado}
                   onChange={manejarCambio}
                 />
-                Destacado
+                Destacado en el inicio
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-900">
+                <input
+                  type="checkbox"
+                  name="personalizable"
+                  checked={form.personalizable}
+                  onChange={manejarCambio}
+                />
+                Se puede personalizar
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-900">
                 <input
@@ -379,7 +360,7 @@ export default function EditarProductoPage() {
             </div>
 
             <div className="border border-gray-200 rounded-lg p-4 bg-white">
-              <p className="font-semibold mb-3 text-gray-900">Promocion / oferta por tiempo</p>
+              <p className="font-semibold mb-3 text-gray-900">Promoción / oferta por tiempo</p>
               <input
                 name="precioOferta"
                 type="number"
@@ -413,11 +394,11 @@ export default function EditarProductoPage() {
             </div>
 
             <div>
-              <p className="font-semibold mb-2 text-gray-900">Tallas y stock</p>
+              <p className="font-semibold mb-2 text-gray-900">Tamaños y stock</p>
               {tallas.map((t, index) => (
                 <div key={index} className="flex gap-2 mb-2">
                   <input
-                    placeholder="Talla (ej: 40)"
+                    placeholder="Tamaño (ej: 15cm)"
                     value={t.talla}
                     onChange={(e) => manejarCambioTalla(index, "talla", e.target.value)}
                     className="border border-gray-300 rounded px-3 py-2 flex-1 bg-white text-gray-900"
@@ -445,13 +426,13 @@ export default function EditarProductoPage() {
                 onClick={agregarTalla}
                 className="text-sm text-blue-600 hover:underline"
               >
-                + Agregar talla
+                + Agregar tamaño
               </button>
             </div>
 
             {imagenesActuales.length > 0 && (
               <div>
-                <p className="font-semibold mb-2 text-gray-900">Imagenes actuales</p>
+                <p className="font-semibold mb-2 text-gray-900">Imágenes actuales</p>
                 <div className="flex gap-2 flex-wrap">
                   {imagenesActuales.map((img) => (
                     <div key={img} className="relative">
@@ -476,7 +457,7 @@ export default function EditarProductoPage() {
             )}
 
             <div>
-              <p className="font-semibold mb-2 text-gray-900">Agregar mas imagenes</p>
+              <p className="font-semibold mb-2 text-gray-900">Agregar más imágenes</p>
               <input
                 type="file"
                 accept="image/*"
@@ -484,6 +465,57 @@ export default function EditarProductoPage() {
                 onChange={(e) => setNuevasImagenes(Array.from(e.target.files))}
                 className="border border-gray-300 rounded px-3 py-2 w-full bg-white text-gray-900"
               />
+            </div>
+
+            {videosActuales.length > 0 && (
+              <div>
+                <p className="font-semibold mb-2 text-gray-900">Videos actuales</p>
+                <div className="flex gap-3 flex-wrap">
+                  {videosActuales.map((video) => (
+                    <div key={video} className="relative">
+                      <video
+                        src={video}
+                        controls
+                        preload="metadata"
+                        className="w-24 h-40 object-cover rounded border border-gray-200 bg-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => manejarEliminarVideo(video)}
+                        disabled={eliminandoVideo === video}
+                        className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-700 transition disabled:opacity-50"
+                        title="Eliminar video"
+                      >
+                        {eliminandoVideo === video ? "..." : "x"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="font-semibold mb-1 text-gray-900">Agregar videos</p>
+              <p className="text-xs text-gray-400 mb-2">
+                Hasta {MAX_VIDEOS} videos por producto, de {MAX_VIDEO_MB} MB cada uno.
+              </p>
+              <input
+                key={claveInputVideos}
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={manejarVideos}
+                className="border border-gray-300 rounded px-3 py-2 w-full bg-white text-gray-900"
+              />
+              {nuevosVideos.length > 0 && (
+                <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                  {nuevosVideos.map((v) => (
+                    <li key={v.name}>
+                      {v.name} ({formatearTamano(v.size)})
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {mensaje && <p className="text-green-600 text-sm">{mensaje}</p>}
@@ -494,17 +526,17 @@ export default function EditarProductoPage() {
               disabled={guardando}
               className="bg-black text-white rounded py-2 font-semibold hover:bg-gray-800 transition disabled:opacity-50"
             >
-              {guardando ? "Guardando..." : "Guardar cambios"}
+              {guardando ? etapa || "Guardando..." : "Guardar cambios"}
             </button>
           </form>
 
           <div className="mt-10 border-t border-gray-200 pt-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">Registrar venta rapida</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900">Registrar venta rápida</h2>
             {tallas
               .filter((t) => t.talla.trim() !== "")
               .map((t) => (
                 <div key={t.talla} className="flex items-center gap-3 mb-2">
-                  <span className="w-16 text-sm font-medium text-gray-900">Talla {t.talla}</span>
+                  <span className="w-20 text-sm font-medium text-gray-900">{t.talla}</span>
                   <span className="text-sm text-gray-500 w-24">Stock: {t.stock}</span>
                   <input
                     type="number"

@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { obtenerProductoPorId } from "../../../lib/api";
+import { obtenerCategoria } from "../../../lib/categorias";
 import GaleriaProducto from "../../../components/GaleriaProducto";
-import GuiaTallas from "../../../components/GuiaTallas";
 import ContadorOferta from "../../../components/ContadorOferta";
 import BotonWhatsapp from "../../../components/BotonWhatsapp";
 import BotonCompartir from "../../../components/BotonCompartir";
@@ -21,36 +22,47 @@ export default async function ProductoPage({ params }) {
 
   if (error || !producto) {
     return (
-      <div className="bg-white min-h-screen">
+      <div className="min-h-[60vh]">
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-          <p className="text-red-500">Producto no encontrado.</p>
+          <p className="text-macu-cream/70 mb-4">No encontramos este tejido.</p>
+          <Link href="/" className="text-macu-gold hover:underline">
+            Volver al inicio
+          </Link>
         </div>
       </div>
     );
   }
 
   const tieneOferta = producto.ofertaActiva === true;
+  const categoria = obtenerCategoria(producto.categoria);
 
   return (
-    <div className="bg-white min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-2 gap-12 border-t-2 border-gray-200 pt-8">
-        <GaleriaProducto imagenes={producto.imagenes} nombre={producto.nombre} />
+    <div className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-2 gap-12">
+        <GaleriaProducto imagenes={producto.imagenes} videos={producto.videos} nombre={producto.nombre} />
 
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{producto.marca}</p>
-          <h1 className="text-4xl font-bold mt-2 text-gray-900">{producto.nombre}</h1>
+          {categoria && (
+            <Link
+              href={`/${categoria.slug}`}
+              className="text-xs text-macu-gold uppercase tracking-widest font-semibold hover:underline"
+            >
+              {categoria.nombre}
+            </Link>
+          )}
+          <h1 className="font-display text-4xl mt-2 text-macu-cream">{producto.nombre}</h1>
           {producto.codigo && (
-            <p className="text-xs text-gray-400 mt-1">Codigo: {producto.codigo}</p>
+            <p className="text-xs text-macu-cream/50 mt-1">Código: {producto.codigo}</p>
           )}
 
-          <div className="mt-6 flex items-center gap-4 pb-6 border-b-2 border-gray-200">
+          <div className="mt-6 flex items-center gap-4 pb-6 border-b border-macu-gold/30">
             {tieneOferta ? (
               <>
-                <span className="text-3xl font-bold text-red-600">S/ {producto.precioOferta}</span>
-                <span className="text-lg text-gray-400 line-through">S/ {producto.precio}</span>
+                <span className="text-3xl font-bold text-macu-gold">S/ {producto.precioOferta}</span>
+                <span className="text-lg text-macu-cream/50 line-through">S/ {producto.precio}</span>
               </>
             ) : (
-              <span className="text-3xl font-bold text-gray-900">S/ {producto.precio}</span>
+              <span className="text-3xl font-bold text-macu-gold">S/ {producto.precio}</span>
             )}
           </div>
 
@@ -61,17 +73,23 @@ export default async function ProductoPage({ params }) {
           )}
 
           {producto.descripcion && (
-            <p className="text-gray-600 mt-6 leading-relaxed text-sm">{producto.descripcion}</p>
+            <p className="text-macu-cream/80 mt-6 leading-relaxed text-sm whitespace-pre-line">{producto.descripcion}</p>
+          )}
+
+          {producto.personalizable && (
+            <p className="mt-6 text-sm border border-macu-gold/40 rounded-xl px-4 py-3 text-macu-cream/90">
+              Este tejido se puede personalizar. Escríbenos con una imagen de referencia y la medida que deseas.
+            </p>
           )}
 
           {producto.colores && producto.colores.length > 0 && (
             <div className="mt-8">
-              <p className="font-bold mb-3 text-sm uppercase tracking-wide text-gray-900">Colores</p>
+              <p className="font-bold mb-3 text-sm uppercase tracking-wide text-macu-gold">Colores</p>
               <div className="flex gap-2 flex-wrap">
                 {producto.colores.map((color) => (
                   <span
                     key={color}
-                    className="border-2 border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-900 hover:bg-black hover:text-white hover:border-black transition"
+                    className="border border-macu-cream/40 rounded-full px-4 py-1.5 text-sm text-macu-cream"
                   >
                     {color}
                   </span>
@@ -82,18 +100,15 @@ export default async function ProductoPage({ params }) {
 
           {producto.tallas && producto.tallas.length > 0 && (
             <div className="mt-8">
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-bold text-sm uppercase tracking-wide text-gray-900">Tallas disponibles</p>
-                {producto.categoria === "hombre" && <GuiaTallas />}
-              </div>
+              <p className="font-bold mb-3 text-sm uppercase tracking-wide text-macu-gold">Tamaños disponibles</p>
               <div className="flex flex-wrap gap-2">
                 {producto.tallas.map((t) => (
                   <span
                     key={t.talla}
-                    className={`border-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    className={`border rounded-full px-4 py-1.5 text-sm ${
                       t.stock > 0
-                        ? "border-gray-300 text-gray-900 hover:bg-black hover:text-white hover:border-black"
-                        : "border-gray-200 text-gray-400 line-through cursor-not-allowed"
+                        ? "border-macu-cream/40 text-macu-cream"
+                        : "border-macu-cream/15 text-macu-cream/30 line-through"
                     }`}
                   >
                     {t.talla}

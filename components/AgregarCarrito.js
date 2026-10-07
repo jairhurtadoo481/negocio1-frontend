@@ -13,14 +13,13 @@ export default function AgregarCarrito({ producto }) {
 
   const manejarAgregar = () => {
     if (!tallaSeleccionada) {
-      setMensaje("Selecciona una talla primero");
+      setMensaje("Selecciona un tamaño primero");
       return;
     }
 
     agregarAlCarrito({
       productoId: producto._id,
       nombre: producto.nombre,
-      marca: producto.marca,
       imagen: producto.imagenes?.[0] || null,
       talla: tallaSeleccionada,
       cantidad: 1,
@@ -28,26 +27,26 @@ export default function AgregarCarrito({ producto }) {
       tieneOferta: producto.ofertaActiva === true,
     });
 
-    setMensaje("Agregado al carrito");
+    setMensaje("Agregado a tu pedido");
     setTimeout(() => setMensaje(""), 2000);
   };
 
   if (tallasConStock.length === 0) {
-    return <p className="text-sm text-gray-500 mt-4">Sin stock disponible por ahora.</p>;
+    return <p className="text-sm text-macu-cream/60 mt-4">Sin stock disponible por ahora. Escríbenos y lo tejemos para ti.</p>;
   }
 
   return (
     <div className="mt-4">
-      <p className="font-semibold mb-2">Selecciona tu talla</p>
+      <p className="font-semibold mb-2 text-macu-cream">Selecciona tu tamaño</p>
       <div className="flex flex-wrap gap-2 mb-3">
         {tallasConStock.map((t) => (
           <button
             key={t.talla}
             onClick={() => setTallaSeleccionada(t.talla)}
-            className={`border rounded px-3 py-1 text-sm ${
+            className={`border rounded-full px-4 py-1.5 text-sm transition ${
               tallaSeleccionada === t.talla
-                ? "bg-black text-white border-black"
-                : "border-gray-300"
+                ? "bg-macu-gold text-macu-navy-dark border-macu-gold font-semibold"
+                : "border-macu-cream/40 text-macu-cream hover:border-macu-gold"
             }`}
           >
             {t.talla}
@@ -57,19 +56,19 @@ export default function AgregarCarrito({ producto }) {
 
       <button
         onClick={manejarAgregar}
-        className="w-full bg-black text-white rounded py-2 font-semibold hover:bg-gray-800 transition"
+        className="w-full bg-macu-gold text-macu-navy-dark rounded-full py-3 font-bold hover:brightness-110 transition"
       >
-        Agregar al carrito
+        Agregar a mi pedido
       </button>
 
       {mensaje && (
         <div className="flex items-center justify-between mt-2">
-          <p className="text-sm text-green-600">{mensaje}</p>
+          <p className="text-sm text-macu-gold">{mensaje}</p>
           <button
             onClick={() => router.push("/carrito")}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-macu-cream hover:text-macu-gold underline"
           >
-            Ver carrito
+            Ver mi pedido
           </button>
         </div>
       )}

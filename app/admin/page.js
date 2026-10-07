@@ -74,12 +74,17 @@ export default function AdminPage() {
         <div className="max-w-2xl mx-auto px-4 py-10">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Panel Admin</h1>
-            <button
-              onClick={cerrarSesion}
-              className="text-sm text-red-600 hover:underline"
-            >
-              Cerrar sesion
-            </button>
+            <div className="flex items-center gap-4">
+              <Link href="/" target="_blank" className="text-sm text-blue-600 hover:underline">
+                Ver tienda
+              </Link>
+              <button
+                onClick={cerrarSesion}
+                className="text-sm text-red-600 hover:underline"
+              >
+                Cerrar sesión
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-8">
@@ -109,7 +114,7 @@ export default function AdminPage() {
               className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
             >
               <p className="font-semibold text-lg text-gray-900">Productos</p>
-              <p className="text-sm text-gray-500">Crear, editar y eliminar productos</p>
+              <p className="text-sm text-gray-500">Crear, editar y eliminar tejidos, fotos y precios</p>
             </Link>
 
             <Link
@@ -117,7 +122,7 @@ export default function AdminPage() {
               className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
             >
               <p className="font-semibold text-lg text-gray-900">Compras</p>
-              <p className="text-sm text-gray-500">Ver y atender compras pendientes</p>
+              <p className="text-sm text-gray-500">Ver y atender los pedidos de los clientes</p>
             </Link>
 
             <Link
@@ -125,55 +130,15 @@ export default function AdminPage() {
               className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
             >
               <p className="font-semibold text-lg text-gray-900">Ventas</p>
-              <p className="text-sm text-gray-500">Historial de ventas y ganancias</p>
-            </Link>
-
-            <Link
-              href="/admin/trabajadores"
-              className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
-            >
-              <p className="font-semibold text-lg text-gray-900">Trabajadores</p>
-              <p className="text-sm text-gray-500">Crear y administrar cuentas del personal</p>
-            </Link>
-
-            <Link
-              href="/admin/inventario-rapido"
-              className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
-            >
-              <p className="font-semibold text-lg text-gray-900">Inventario rapido</p>
-              <p className="text-sm text-gray-500">Escanea cajas para agregar stock o crear productos nuevos</p>
-            </Link>
-
-            <Link
-              href="/admin/mayoristas"
-              className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
-            >
-              <p className="font-semibold text-lg text-gray-900">Mayoristas</p>
-              <p className="text-sm text-gray-500">Crear cuentas y ver reservas al por mayor</p>
-            </Link>
-
-            <Link
-              href="/admin/precios"
-              className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
-            >
-              <p className="font-semibold text-lg text-gray-900">Precios</p>
-              <p className="text-sm text-gray-500">Editar precio web y precio presencial por marca</p>
+              <p className="text-sm text-gray-500">Historial de ventas, gráficos y ventas directas</p>
             </Link>
 
             <Link
               href="/admin/configuracion"
               className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
             >
-              <p className="font-semibold text-lg text-gray-900">Configuracion</p>
+              <p className="font-semibold text-lg text-gray-900">Configuración</p>
               <p className="text-sm text-gray-500">QR de Yape y Plin para pagos</p>
-            </Link>
-
-            <Link
-              href="/admin/facturacion"
-              className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white"
-            >
-              <p className="font-semibold text-lg text-gray-900">Facturacion Electronica</p>
-              <p className="text-sm text-gray-500">Emitir boletas y facturas electronicas vinculadas a SUNAT</p>
             </Link>
           </div>
         </div>

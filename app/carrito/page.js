@@ -15,7 +15,6 @@ const claseInput = "border border-gray-300 rounded px-3 py-2 bg-white text-gray-
 const METODOS_PAGO = [
   { id: "yape", nombre: "Yape", logo: "/yape.png", colorBorde: "border-purple-600", colorFondo: "bg-purple-50" },
   { id: "plin", nombre: "Plin", logo: "/plin.png", colorBorde: "border-teal-500", colorFondo: "bg-teal-50" },
-  { id: "bcp", nombre: "BCP", logo: "/bcp.jpg", colorBorde: "border-blue-600", colorFondo: "bg-blue-50" },
 ];
 
 export default function CarritoPage() {
@@ -26,7 +25,7 @@ export default function CarritoPage() {
   const [form, setForm] = useState({
     nombre: "",
     celular: "",
-    ciudad: "andahuaylas",
+    ciudad: "ica",
     entregaDomicilio: false,
     direccion: "",
   });
@@ -50,6 +49,8 @@ export default function CarritoPage() {
 
   const total = items.reduce((acc, item) => acc + item.precioUnitario * item.cantidad, 0);
   const algunaOferta = items.some((item) => item.tieneOferta);
+  const pagoCompleto = algunaOferta || form.ciudad === "fuera";
+  const montoAPagar = pagoCompleto ? total : Math.round(total * 50) / 100;
 
   const manejarCambioForm = (e) => {
     const { name, value, type, checked } = e.target;
@@ -63,7 +64,7 @@ export default function CarritoPage() {
 
   const irAQr = () => {
     if (!metodoPago) {
-      setError("Selecciona un metodo de pago");
+      setError("Selecciona un método de pago");
       return;
     }
     setError("");
@@ -114,16 +115,16 @@ export default function CarritoPage() {
     }
   };
 
-  const fondoOscuro = "min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black";
+  const fondoOscuro = "min-h-screen";
 
   if (paso === "exito") {
     return (
       <div className={fondoOscuro}>
         <div className="max-w-lg mx-auto px-4 py-16 text-center">
           <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h1 className="text-2xl font-bold text-green-600 mb-3">Compra exitosa!</h1>
+            <h1 className="text-2xl font-bold text-green-600 mb-3">¡Pedido recibido!</h1>
             <p className="text-gray-700 mb-2">Tu numero de pedido es #{numeroFinal}</p>
-            <p className="text-gray-700 mb-6">Nuestro personal se comunicara en breve para confirmar tu compra.</p>
+            <p className="text-gray-700 mb-6">Te escribiremos en breve para confirmar tu pedido.</p>
             <div className="flex flex-col gap-3 items-center">
               <Link href="/seguimiento" className="text-sm text-blue-600 hover:underline">
                 Ver estado de mi pedido
@@ -146,7 +147,10 @@ export default function CarritoPage() {
       <div className={fondoOscuro}>
         <div className="max-w-lg mx-auto px-4 py-16 text-center">
           <div className="bg-white rounded-2xl shadow-xl p-8">
-            <p className="text-gray-500">Tu carrito esta vacio.</p>
+            <p className="text-gray-500 mb-4">Tu pedido está vacío.</p>
+            <Link href="/" className="text-sm text-blue-600 hover:underline">
+              Ver el catálogo
+            </Link>
           </div>
         </div>
       </div>
@@ -158,9 +162,9 @@ export default function CarritoPage() {
       <div className="max-w-2xl mx-auto px-4 py-10">
         {paso === "carrito" && (
           <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-            <h1 className="text-2xl font-bold mb-2 text-gray-900">Mi carrito</h1>
+            <h1 className="text-2xl font-bold mb-2 text-gray-900">Mi pedido</h1>
             <p className="text-sm text-gray-500 mb-6">
-              Revisa los productos que agregaste. Cuando estes listo, presiona "Iniciar compra" para continuar con tus datos y el pago.
+              Revisa los tejidos que agregaste. Cuando estés listo, presiona "Continuar" para ingresar tus datos y el adelanto.
             </p>
 
             <div className="flex flex-col gap-3 mb-6">
@@ -179,10 +183,9 @@ export default function CarritoPage() {
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 uppercase">{item.marca}</p>
                     <p className="font-semibold text-gray-900">{item.nombre}</p>
                     <p className="text-sm text-gray-500">
-                      Talla {item.talla} - Cantidad {item.cantidad}
+                      Tamaño {item.talla} - Cantidad {item.cantidad}
                     </p>
                     {item.tieneOferta && (
                       <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">
@@ -210,15 +213,15 @@ export default function CarritoPage() {
 
             {algunaOferta && (
               <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm rounded p-3 mb-6">
-                Uno o mas productos de tu seleccion estan en oferta. Se requiere el pago completo.
+                Uno o más tejidos de tu pedido están en oferta. Se requiere el pago completo.
               </div>
             )}
 
             <button
               onClick={() => setPaso("datos")}
-              className="w-full bg-black text-white rounded py-3 font-semibold hover:bg-gray-800 transition"
+              className="w-full bg-macu-navy text-macu-cream rounded py-3 font-semibold hover:bg-macu-navy-light transition"
             >
-              Iniciar compra
+              Continuar
             </button>
           </div>
         )}
@@ -229,7 +232,7 @@ export default function CarritoPage() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Paso 1 de 4</p>
               <h2 className="text-xl font-bold text-gray-900">Completa tus datos</h2>
               <p className="text-sm text-gray-500 -mt-2">
-                Ingresa tu nombre, celular y ciudad para que podamos coordinar la entrega o recojo de tu pedido. Si quieres que te lo llevemos a domicilio, marca la casilla y agrega tu direccion.
+                Ingresa tu nombre, celular y ciudad para coordinar la entrega. En Ica entregamos gratis en la Plaza de Armas; el delivery tiene costo adicional. Fuera de Ica enviamos por Shalom con pago del 100%.
               </p>
 
               <input
@@ -242,7 +245,7 @@ export default function CarritoPage() {
               />
               <input
                 name="celular"
-                placeholder="Numero de celular"
+                placeholder="Número de celular"
                 value={form.celular}
                 onChange={manejarCambioForm}
                 className={claseInput}
@@ -255,8 +258,8 @@ export default function CarritoPage() {
                 onChange={manejarCambioForm}
                 className={claseInput}
               >
-                <option value="andahuaylas">Andahuaylas</option>
-                <option value="fuera">Fuera de Andahuaylas</option>
+                <option value="ica">Ica</option>
+                <option value="fuera">Fuera de Ica (envío por Shalom)</option>
               </select>
 
               <label className="flex items-center gap-2 text-sm text-gray-900">
@@ -266,13 +269,13 @@ export default function CarritoPage() {
                   checked={form.entregaDomicilio}
                   onChange={manejarCambioForm}
                 />
-                Quiero que me lo entreguen/lleven a mi casa
+                Quiero delivery a mi casa (costo adicional)
               </label>
 
               {form.entregaDomicilio && (
                 <input
                   name="direccion"
-                  placeholder="Direccion completa"
+                  placeholder="Dirección completa"
                   value={form.direccion}
                   onChange={manejarCambioForm}
                   className={claseInput}
@@ -293,12 +296,12 @@ export default function CarritoPage() {
         {paso === "pago" && (
           <div className="rounded-2xl p-6 md:p-10 shadow-xl">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Paso 2 de 4</p>
-            <h2 className="text-2xl font-bold mb-2 text-white">Metodo de pago</h2>
+            <h2 className="text-2xl font-bold mb-2 text-white">Método de pago</h2>
             <p className="text-sm text-gray-300 mb-6">
-              Elige con que app vas a pagar. En el siguiente paso te mostraremos el codigo QR correspondiente para que hagas el pago.
+              Elige con qué app vas a pagar. En el siguiente paso te mostraremos el código QR para que hagas el pago.
             </p>
 
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-6">
               {METODOS_PAGO.map((metodo) => {
                 const seleccionado = metodoPago === metodo.id;
                 return (
@@ -332,7 +335,7 @@ export default function CarritoPage() {
             <button
               onClick={irAQr}
               disabled={!metodoPago}
-              className="w-full bg-white text-gray-900 rounded-lg py-3 font-bold hover:bg-gray-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full bg-macu-gold text-macu-navy-dark rounded-full py-3 font-bold hover:brightness-110 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Siguiente paso
             </button>
@@ -343,10 +346,10 @@ export default function CarritoPage() {
           <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 text-center">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Paso 3 de 4</p>
             <h2 className="text-xl font-bold mb-2 text-gray-900">
-              Escanea el QR de {metodoPago === "yape" ? "Yape" : metodoPago === "plin" ? "Plin" : "BCP"}
+              Escanea el QR de {metodoPago === "yape" ? "Yape" : "Plin"}
             </h2>
             <p className="text-sm text-gray-500 mb-4">
-              Abre tu app de {metodoPago === "yape" ? "Yape" : metodoPago === "plin" ? "Plin" : "BCP"}, escanea este codigo y paga exactamente el monto indicado abajo. Cuando termines, toma una captura de pantalla del comprobante y presiona el boton.
+              Abre tu app de {metodoPago === "yape" ? "Yape" : "Plin"}, escanea este código y paga exactamente el monto indicado abajo. Cuando termines, toma una captura de pantalla del comprobante y presiona el botón.
             </p>
 
             <div className="flex justify-center mb-4">
@@ -356,23 +359,26 @@ export default function CarritoPage() {
               {metodoPago === "plin" && config.qrPlin && (
                 <img src={config.qrPlin} alt="QR Plin" className="w-56 h-56 object-contain border border-gray-200 rounded" />
               )}
-              {metodoPago === "bcp" && config.qrBcp && (
-                <img src={config.qrBcp} alt="QR BCP" className="w-56 h-56 object-contain border border-gray-200 rounded" />
-              )}
               {((metodoPago === "yape" && !config.qrYape) ||
-                (metodoPago === "plin" && !config.qrPlin) ||
-                (metodoPago === "bcp" && !config.qrBcp)) && (
-                <p className="text-gray-500 text-sm">QR no disponible por el momento, contactanos por WhatsApp.</p>
+                (metodoPago === "plin" && !config.qrPlin)) && (
+                <p className="text-gray-500 text-sm">QR no disponible por el momento, escríbenos por WhatsApp.</p>
               )}
             </div>
 
-            <p className="text-lg font-bold mb-6 text-gray-900">Monto a pagar: S/ {total}</p>
+            <p className="text-lg font-bold text-gray-900">
+              {pagoCompleto ? "Pago completo" : "Adelanto del 50%"}: S/ {montoAPagar}
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              {pagoCompleto
+                ? "El pedido se paga al 100% antes del envío."
+                : `El resto (S/ ${Math.round((total - montoAPagar) * 100) / 100}) lo pagas contra entrega.`}
+            </p>
 
             <button
               onClick={irAComprobante}
-              className="w-full bg-black text-white rounded py-3 font-semibold hover:bg-gray-800 transition"
+              className="w-full bg-macu-navy text-macu-cream rounded py-3 font-semibold hover:bg-macu-navy-light transition"
             >
-              Ya pague, siguiente paso
+              Ya pagué, siguiente paso
             </button>
           </div>
         )}
@@ -382,7 +388,7 @@ export default function CarritoPage() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Paso 4 de 4</p>
             <h2 className="text-xl font-bold mb-2 text-gray-900">Sube tu comprobante de pago</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Selecciona la captura de pantalla o foto del comprobante de tu pago y presiona "Finalizar compra". Nuestro personal verificara el pago y se comunicara contigo en breve.
+              Selecciona la captura o foto del comprobante de tu pago y presiona "Enviar pedido". Verificaremos el pago y te escribiremos en breve.
             </p>
 
             <input
@@ -399,7 +405,7 @@ export default function CarritoPage() {
               disabled={enviando}
               className="w-full bg-green-600 text-white rounded py-3 font-semibold hover:bg-green-700 transition disabled:opacity-50"
             >
-              {enviando ? "Enviando..." : "Finalizar compra"}
+              {enviando ? "Enviando..." : "Enviar pedido"}
             </button>
           </div>
         )}

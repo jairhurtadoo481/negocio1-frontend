@@ -6,39 +6,12 @@ import { useRouter } from "next/navigation";
 import ProtegerAdmin from "../../../components/ProtegerAdmin";
 import { obtenerProductos, eliminarProducto } from "../../../lib/api";
 import { obtenerToken } from "../../../lib/auth";
-
-const nombreSucursal = {
-  sucursal1: "Sucursal 1",
-  sucursal2: "Sucursal 2",
-};
+import { CATEGORIAS, nombreCategoria } from "../../../lib/categorias";
 
 const categorias = [
   { valor: "todos", etiqueta: "Todos" },
-  { valor: "hombre", etiqueta: "Hombre" },
-  { valor: "mujer", etiqueta: "Mujer" },
-  { valor: "ninios", etiqueta: "Ninios" },
+  ...CATEGORIAS.map((c) => ({ valor: c.slug, etiqueta: c.nombre })),
 ];
-
-const tipos = ["todos", "running", "urbano", "casual", "deportivo", "botines"];
-
-const marcas = [
-  "todas",
-  "Joma",
-  "Nike",
-  "Adidas",
-  "Puma",
-  "Lacoste",
-  "Punto Original",
-  "CRforward",
-  "VD-Dariems",
-  "New Athletic",
-  "Michelin",
-  "Underarmour",
-  "Nacionales (Marcelo)",
-  "Ni Air Running",
-];
-
-const claseSelect = "text-sm border border-gray-300 rounded px-3 py-2 bg-white text-gray-900";
 
 export default function AdminProductosPage() {
   const router = useRouter();
@@ -46,9 +19,6 @@ export default function AdminProductosPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("todos");
-  const [filtroTipo, setFiltroTipo] = useState("todos");
-  const [filtroSucursal, setFiltroSucursal] = useState("todas");
-  const [filtroMarca, setFiltroMarca] = useState("todas");
   const [busqueda, setBusqueda] = useState("");
 
   const cargarProductos = async () => {
@@ -68,7 +38,7 @@ export default function AdminProductosPage() {
   }, []);
 
   const manejarEliminar = async (id, nombre) => {
-    const confirmar = window.confirm(`Eliminar "${nombre}"? Esta accion no se puede deshacer.`);
+    const confirmar = window.confirm(`¿Eliminar "${nombre}"? Esta acción no se puede deshacer.`);
     if (!confirmar) return;
 
     try {
@@ -83,14 +53,12 @@ export default function AdminProductosPage() {
   const manejarDuplicar = (producto) => {
     const copia = {
       codigo: "",
-      sucursal: producto.sucursal,
       nombre: producto.nombre,
       modeloBase: producto.modeloBase || "",
-      marca: producto.marca,
       descripcion: producto.descripcion || "",
       precio: producto.precio,
       categoria: producto.categoria,
-      tipo: producto.tipo,
+      personalizable: producto.personalizable === true,
       colores: (producto.colores || []).join(", "),
       tallas: producto.tallas || [],
     };
@@ -100,9 +68,6 @@ export default function AdminProductosPage() {
 
   const productosFiltrados = productos.filter((p) => {
     if (filtroCategoria !== "todos" && p.categoria !== filtroCategoria) return false;
-    if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
-    if (filtroSucursal !== "todas" && p.sucursal !== filtroSucursal) return false;
-    if (filtroMarca !== "todas" && p.marca !== filtroMarca) return false;
     if (busqueda.trim()) {
       const termino = busqueda.trim().toLowerCase();
       const coincideCodigo = p.codigo && p.codigo.toLowerCase().includes(termino);
@@ -122,7 +87,7 @@ export default function AdminProductosPage() {
       <div className="bg-white min-h-screen">
         <div className="max-w-4xl mx-auto px-4 py-10">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Gestion de productos</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Gestión de productos</h1>
             <Link
               href="/admin/productos/nuevo"
               className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
@@ -148,43 +113,9 @@ export default function AdminProductosPage() {
           </div>
 
           <div className="flex gap-2 mb-4 flex-wrap items-center">
-            <select
-              value={filtroMarca}
-              onChange={(e) => setFiltroMarca(e.target.value)}
-              className={claseSelect}
-            >
-              {marcas.map((m) => (
-                <option key={m} value={m}>
-                  {m === "todas" ? "Todas las marcas" : m}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className={claseSelect}
-            >
-              {tipos.map((t) => (
-                <option key={t} value={t}>
-                  {t === "todos" ? "Todos los tipos" : t.charAt(0).toUpperCase() + t.slice(1)}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filtroSucursal}
-              onChange={(e) => setFiltroSucursal(e.target.value)}
-              className={claseSelect}
-            >
-              <option value="todas">Todas las sucursales</option>
-              <option value="sucursal1">Sucursal 1</option>
-              <option value="sucursal2">Sucursal 2</option>
-            </select>
-
             <input
               type="text"
-              placeholder="Buscar por codigo o nombre..."
+              placeholder="Buscar por código o nombre..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               className="text-sm border border-gray-300 rounded px-3 py-2 flex-1 min-w-[200px] bg-white text-gray-900 placeholder-gray-400"
@@ -225,14 +156,16 @@ export default function AdminProductosPage() {
                         #{producto.codigo}
                       </span>
                     )}
-                    <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
-                      {nombreSucursal[producto.sucursal] || "Sucursal 1"}
-                    </span>
-                    <p className="text-xs text-gray-500 uppercase">{producto.marca}</p>
+                    {producto.destacado && (
+                      <span className="text-xs bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded">Destacado</span>
+                    )}
+                    {producto.personalizable && (
+                      <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">Personalizable</span>
+                    )}
                   </div>
                   <p className="font-semibold text-gray-900">{producto.nombre}</p>
                   <p className="text-sm text-gray-500">
-                    {producto.categoria} / {producto.tipo} - S/ {producto.precio}
+                    {nombreCategoria(producto.categoria)} - S/ {producto.precio}
                   </p>
                 </div>
 

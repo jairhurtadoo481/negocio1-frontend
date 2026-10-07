@@ -19,8 +19,8 @@ import ProtegerAdmin from "../../../components/ProtegerAdmin";
 import {
   obtenerReservas,
   obtenerVentas,
-  buscarProductoPorCodigo,
-  registrarVentaPorCodigo,
+  obtenerProductos,
+  registrarVenta,
   eliminarVenta,
   eliminarReserva,
 } from "../../../lib/api";
@@ -37,8 +37,9 @@ const formatearHora = (fecha) => {
 };
 
 const nombreMetodo = { yape: "Yape", plin: "Plin" };
-const nombreSucursal = { sucursal1: "Sucursal 1", sucursal2: "Sucursal 2" };
-const COLORES = ["#000000", "#6b7280", "#a855f7", "#f97316"];
+const ORIGEN_WEB = "Compra web";
+const ORIGEN_DIRECTA = "Venta directa";
+const COLORES = ["#273e60", "#e9b84a", "#35527f", "#f97316"];
 
 const esHoy = (fecha) => new Date(fecha).toDateString() === new Date().toDateString();
 
@@ -68,12 +69,12 @@ const ultimos7Dias = () => {
 };
 
 const descargarCSV = (filas) => {
-  const encabezados = ["Fecha", "Hora", "Origen", "Vendedor", "Metodo", "Codigo", "Producto", "Cantidad", "Descuento", "Subtotal"];
+  const encabezados = ["Fecha", "Hora", "Origen", "Cliente", "Método", "Código", "Producto", "Cantidad", "Descuento", "Subtotal"];
   const filasCSV = filas.map((f) => [
     formatearFecha(f.fecha),
     formatearHora(f.fecha),
     f.origen,
-    f.vendedor,
+    `"${f.cliente.replace(/"/g, '""')}"`,
     f.metodo,
     f.codigo,
     `"${f.nombre.replace(/"/g, '""')}"`,
@@ -83,7 +84,7 @@ const descargarCSV = (filas) => {
   ]);
 
   const csv = [encabezados.join(","), ...filasCSV.map((fila) => fila.join(","))].join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
   enlace.href = url;
@@ -99,12 +100,12 @@ export default function VentasPage() {
   const [error, setError] = useState("");
 
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [codigo, setCodigo] = useState("");
-  const [productoEncontrado, setProductoEncontrado] = useState(null);
+  const [catalogo, setCatalogo] = useState([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [productoElegido, setProductoElegido] = useState(null);
   const [tallaElegida, setTallaElegida] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [descuento, setDescuento] = useState("");
-  const [buscando, setBuscando] = useState(false);
   const [errorModal, setErrorModal] = useState("");
   const [registrando, setRegistrando] = useState(false);
   const [eliminandoId, setEliminandoId] = useState(null);
@@ -123,7 +124,7 @@ export default function VentasPage() {
 
       reservas.forEach((reserva) => {
         const productosTexto = reserva.items
-          .map((item) => `${item.nombre} (T${item.talla} x${item.cantidad})`)
+          .map((item) => `${item.nombre} (${item.talla} x${item.cantidad})`)
           .join(", ");
         const codigosTexto = reserva.items
           .map((item) => item.codigo)
@@ -135,9 +136,8 @@ export default function VentasPage() {
         filasExpandidas.push({
           id: reserva._id,
           tipo: "reserva",
-          origen: "Compra web",
+          origen: ORIGEN_WEB,
           metodo: nombreMetodo[reserva.metodoPago] || "-",
-          vendedor: reserva.cliente.nombre + " (cliente)",
           fecha: reserva.updatedAt,
           codigo: codigosTexto || "-",
           nombre: productosTexto,
@@ -149,41 +149,36 @@ export default function VentasPage() {
 
         reserva.items.forEach((item) => {
           itemsExpandidos.push({
-            origen: "Compra web",
+            origen: ORIGEN_WEB,
             nombre: item.nombre,
             cantidad: item.cantidad,
             subtotal: item.precioUnitario * item.cantidad,
-            sucursal: item.sucursal || "sucursal1",
-            vendedor: null,
-            fecha: reserva.updatedAt,
           });
         });
       });
 
       ventas.forEach((venta) => {
+        const subtotal = venta.precioUnitario * venta.cantidad - (venta.descuento || 0);
+
         filasExpandidas.push({
           id: venta._id,
           tipo: "venta",
-          origen: "Tienda",
+          origen: ORIGEN_DIRECTA,
           metodo: "-",
-          vendedor: venta.vendedorNombre || "-",
           fecha: venta.createdAt,
           codigo: venta.codigo ? `#${venta.codigo}` : "-",
-          nombre: `${venta.nombre} (T${venta.talla} x${venta.cantidad})`,
+          nombre: `${venta.nombre} (${venta.talla} x${venta.cantidad})`,
           cantidad: venta.cantidad,
           descuento: venta.descuento || 0,
-          subtotal: venta.precioUnitario * venta.cantidad - (venta.descuento || 0),
+          subtotal,
           cliente: "-",
         });
 
         itemsExpandidos.push({
-          origen: "Tienda",
+          origen: ORIGEN_DIRECTA,
           nombre: venta.nombre,
           cantidad: venta.cantidad,
-          subtotal: venta.precioUnitario * venta.cantidad - (venta.descuento || 0),
-          sucursal: venta.sucursal || "sucursal1",
-          vendedor: venta.vendedorNombre || "Sin asignar",
-          fecha: venta.createdAt,
+          subtotal,
         });
       });
 
@@ -201,29 +196,28 @@ export default function VentasPage() {
     cargarTodo();
   }, []);
 
-  const buscarPorCodigo = async () => {
-    if (!codigo.trim()) return;
-    setErrorModal("");
-    setBuscando(true);
-    setProductoEncontrado(null);
-
+  const abrirModal = async () => {
+    setModalAbierto(true);
+    if (catalogo.length > 0) return;
     try {
-      const token = obtenerToken();
-      const producto = await buscarProductoPorCodigo(token, codigo.trim());
-      setProductoEncontrado(producto);
-      setTallaElegida("");
-      setCantidad(1);
-      setDescuento("");
+      const data = await obtenerProductos({ limit: 1000 });
+      setCatalogo(data.productos);
     } catch (err) {
       setErrorModal(err.message);
-    } finally {
-      setBuscando(false);
     }
+  };
+
+  const elegirProducto = (producto) => {
+    setProductoElegido(producto);
+    setTallaElegida("");
+    setCantidad(1);
+    setDescuento("");
+    setErrorModal("");
   };
 
   const confirmarVenta = async () => {
     if (!tallaElegida) {
-      setErrorModal("Selecciona una talla");
+      setErrorModal("Selecciona un tamaño");
       return;
     }
 
@@ -232,13 +226,7 @@ export default function VentasPage() {
 
     try {
       const token = obtenerToken();
-      await registrarVentaPorCodigo(
-        token,
-        codigo.trim(),
-        tallaElegida,
-        Number(cantidad),
-        Number(descuento) || 0
-      );
+      await registrarVenta(token, productoElegido._id, tallaElegida, Number(cantidad), Number(descuento) || 0);
       cerrarModal();
       cargarTodo();
     } catch (err) {
@@ -250,8 +238,8 @@ export default function VentasPage() {
 
   const cerrarModal = () => {
     setModalAbierto(false);
-    setCodigo("");
-    setProductoEncontrado(null);
+    setBusqueda("");
+    setProductoElegido(null);
     setTallaElegida("");
     setCantidad(1);
     setDescuento("");
@@ -259,7 +247,7 @@ export default function VentasPage() {
   };
 
   const manejarEliminarVenta = async (id, nombre) => {
-    const confirmar = window.confirm(`Eliminar esta venta (${nombre})? El stock se va a restaurar automaticamente.`);
+    const confirmar = window.confirm(`¿Eliminar esta venta (${nombre})? El stock se va a restaurar automáticamente.`);
     if (!confirmar) return;
 
     setEliminandoId(id);
@@ -275,7 +263,7 @@ export default function VentasPage() {
   };
 
   const manejarEliminarReserva = async (id, nombre) => {
-    const confirmar = window.confirm(`Eliminar esta compra web (${nombre}) por completo?`);
+    const confirmar = window.confirm(`¿Eliminar esta compra web (${nombre}) por completo?`);
     if (!confirmar) return;
 
     setEliminandoId(id);
@@ -292,8 +280,8 @@ export default function VentasPage() {
 
   const totalGeneral = filas.reduce((acc, f) => acc + f.subtotal, 0);
 
-  const totalConDescuento = productoEncontrado
-    ? productoEncontrado.precio * cantidad - (Number(descuento) || 0)
+  const totalConDescuento = productoElegido
+    ? productoElegido.precio * cantidad - (Number(descuento) || 0)
     : 0;
 
   const totalHoy = filas.filter((f) => esHoy(f.fecha)).reduce((acc, f) => acc + f.subtotal, 0);
@@ -325,224 +313,185 @@ export default function VentasPage() {
     .sort((a, b) => b.cantidad - a.cantidad)
     .slice(0, 5);
 
-  const rankingVendedores = Object.values(
-    itemsDetalle
-      .filter((item) => item.origen === "Tienda")
-      .reduce((acc, item) => {
-        if (!acc[item.vendedor]) acc[item.vendedor] = { vendedor: item.vendedor, cantidad: 0, total: 0 };
-        acc[item.vendedor].cantidad += item.cantidad;
-        acc[item.vendedor].total += item.subtotal;
-        return acc;
-      }, {})
-  ).sort((a, b) => b.total - a.total);
-
-  const datosOrigen = ["Compra web", "Tienda"].map((origen) => ({
+  const datosOrigen = [ORIGEN_WEB, ORIGEN_DIRECTA].map((origen) => ({
     name: origen,
     value: itemsDetalle.filter((i) => i.origen === origen).reduce((acc, i) => acc + i.subtotal, 0),
   }));
 
-  const datosSucursal = ["sucursal1", "sucursal2"].map((suc) => ({
-    name: nombreSucursal[suc],
-    value: itemsDetalle.filter((i) => i.sucursal === suc).reduce((acc, i) => acc + i.subtotal, 0),
-  }));
+  const termino = busqueda.trim().toLowerCase();
+  const resultadosBusqueda = termino
+    ? catalogo
+        .filter((p) => p.nombre.toLowerCase().includes(termino) || (p.codigo && p.codigo.toLowerCase().includes(termino)))
+        .slice(0, 6)
+    : [];
 
   return (
     <ProtegerAdmin>
       <div className="bg-white min-h-screen">
-      <div className="max-w-5xl mx-auto px-4 py-10 text-gray-900">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Ventas</h1>
-          <div className="flex gap-3">
-            <button
-              onClick={() => descargarCSV(filas)}
-              className="text-sm bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 transition"
-            >
-              Exportar CSV
-            </button>
-            <button
-              onClick={() => setModalAbierto(true)}
-              className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
-            >
-              + Agregar venta
-            </button>
-            <Link href="/admin/reservas" className="text-sm text-blue-600 hover:underline self-center">
-              Volver a compras
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900 text-center">
-            <p className="text-xs text-gray-500">Hoy</p>
-            <p className="text-xl font-bold">S/ {totalHoy}</p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900 text-center">
-            <p className="text-xs text-gray-500">Esta semana</p>
-            <p className="text-xl font-bold">S/ {totalSemana}</p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900 text-center">
-            <p className="text-xs text-gray-500">Este mes</p>
-            <p className="text-xl font-bold">S/ {totalMes}</p>
-          </div>
-        </div>
-
-        <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900 mb-6">
-          <p className="font-semibold mb-3 text-sm">Ventas de los ultimos 7 dias</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={datosGrafico}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="dia" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value) => [`S/ ${value}`, "Total"]} />
-              <Bar dataKey="total" fill="#000000" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900">
-            <p className="font-semibold mb-3 text-sm">Compra web vs Tienda</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={datosOrigen} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
-                  {datosOrigen.map((entry, index) => (
-                    <Cell key={index} fill={COLORES[index % COLORES.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `S/ ${value}`} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900">
-            <p className="font-semibold mb-3 text-sm">Sucursal 1 vs Sucursal 2</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={datosSucursal} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
-                  {datosSucursal.map((entry, index) => (
-                    <Cell key={index} fill={COLORES[index % COLORES.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `S/ ${value}`} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900">
-            <p className="font-semibold mb-3 text-sm">Top 5 productos mas vendidos</p>
-            {topProductos.length === 0 && <p className="text-xs text-gray-400">Sin datos aun.</p>}
-            <div className="flex flex-col gap-2">
-              {topProductos.map((p, i) => (
-                <div key={p.nombre} className="flex items-center justify-between text-sm">
-                  <span>{i + 1}. {p.nombre}</span>
-                  <span className="font-semibold">{p.cantidad} vendidos</span>
-                </div>
-              ))}
+        <div className="max-w-5xl mx-auto px-4 py-10 text-gray-900">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <h1 className="text-2xl font-bold">Ventas</h1>
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={() => descargarCSV(filas)}
+                className="text-sm bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800 transition"
+              >
+                Exportar CSV
+              </button>
+              <button
+                onClick={abrirModal}
+                className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
+              >
+                + Agregar venta
+              </button>
+              <Link href="/admin/reservas" className="text-sm text-blue-600 hover:underline self-center">
+                Volver a compras
+              </Link>
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-gray-900">
-            <p className="font-semibold mb-3 text-sm">Ranking de vendedores (tienda)</p>
-            {rankingVendedores.length === 0 && <p className="text-xs text-gray-400">Sin datos aun.</p>}
-            <div className="flex flex-col gap-2">
-              {rankingVendedores.map((v, i) => (
-                <div key={v.vendedor} className="flex items-center justify-between text-sm">
-                  <span>{i === 0 ? "1st" : i === 1 ? "2nd" : `${i + 1}.`} {v.vendedor}</span>
-                  <span className="font-semibold">S/ {v.total} ({v.cantidad} pares)</span>
-                </div>
-              ))}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="border border-gray-200 rounded-lg p-4 bg-white text-center">
+              <p className="text-xs text-gray-500">Hoy</p>
+              <p className="text-xl font-bold">S/ {totalHoy}</p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-4 bg-white text-center">
+              <p className="text-xs text-gray-500">Esta semana</p>
+              <p className="text-xl font-bold">S/ {totalSemana}</p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-4 bg-white text-center">
+              <p className="text-xs text-gray-500">Este mes</p>
+              <p className="text-xl font-bold">S/ {totalMes}</p>
             </div>
           </div>
-        </div>
 
-        <div className="flex gap-4 text-xs text-gray-500 mb-4">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-blue-200 border border-blue-400 inline-block"></span> Compra web
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-green-200 border border-green-400 inline-block"></span> Venta en tienda
-          </span>
-        </div>
+          <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+            <p className="font-semibold mb-3 text-sm">Ventas de los últimos 7 días</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={datosGrafico}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="dia" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(value) => [`S/ ${value}`, "Total"]} />
+                <Bar dataKey="total" fill="#273e60" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-        {cargando && <p className="text-gray-500">Cargando...</p>}
-        {error && <p className="text-red-600">{error}</p>}
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <div className="border border-gray-200 rounded-lg p-4 bg-white">
+              <p className="font-semibold mb-3 text-sm">Compra web vs Venta directa</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={datosOrigen} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
+                    {datosOrigen.map((entry, index) => (
+                      <Cell key={index} fill={COLORES[index % COLORES.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `S/ ${value}`} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-        {!cargando && filas.length === 0 && (
-          <p className="text-gray-500">Aun no hay ventas registradas.</p>
-        )}
+            <div className="border border-gray-200 rounded-lg p-4 bg-white">
+              <p className="font-semibold mb-3 text-sm">Top 5 tejidos más vendidos</p>
+              {topProductos.length === 0 && <p className="text-xs text-gray-400">Sin datos aún.</p>}
+              <div className="flex flex-col gap-2">
+                {topProductos.map((p, i) => (
+                  <div key={p.nombre} className="flex items-center justify-between text-sm">
+                    <span>{i + 1}. {p.nombre}</span>
+                    <span className="font-semibold">{p.cantidad} vendidos</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
-        {filas.length > 0 && (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border border-gray-300 rounded-lg overflow-hidden text-gray-900">
-                <thead className="bg-gray-800 text-white text-left">
-                  <tr>
-                    <th className="p-2">Fecha</th>
-                    <th className="p-2">Hora</th>
-                    <th className="p-2">Origen</th>
-                    <th className="p-2">Vendedor</th>
-                    <th className="p-2">Metodo</th>
-                    <th className="p-2">Codigo</th>
-                    <th className="p-2">Producto(s)</th>
-                    <th className="p-2">Cant.</th>
-                    <th className="p-2">Descuento</th>
-                    <th className="p-2">Subtotal</th>
-                    <th className="p-2">Accion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filas.map((f, i) => (
-                    <tr
-                      key={i}
-                      className={`border-t border-gray-300 align-top border-l-4 font-medium ${
-                        f.origen === "Compra web" ? "bg-blue-200 border-l-blue-700" : "bg-green-200 border-l-green-700"
-                      }`}
-                    >
-                      <td className="p-2">{formatearFecha(f.fecha)}</td>
-                      <td className="p-2">{formatearHora(f.fecha)}</td>
-                      <td className="p-2">{f.origen}</td>
-                      <td className="p-2">{f.vendedor}</td>
-                      <td className="p-2">{f.metodo}</td>
-                      <td className="p-2">{f.codigo}</td>
-                      <td className="p-2">{f.nombre}</td>
-                      <td className="p-2">{f.cantidad}</td>
-                      <td className="p-2">
-                        {f.descuento > 0 ? (
-                          <span className="text-red-700">- S/ {f.descuento}</span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td className="p-2 font-bold">S/ {f.subtotal}</td>
-                      <td className="p-2">
-                        <button
-                          onClick={() =>
-                            f.tipo === "venta"
-                              ? manejarEliminarVenta(f.id, f.nombre)
-                              : manejarEliminarReserva(f.id, f.nombre)
-                          }
-                          disabled={eliminandoId === f.id}
-                          className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition disabled:opacity-50"
-                        >
-                          {eliminandoId === f.id ? "..." : "Eliminar"}
-                        </button>
-                      </td>
+          <div className="flex gap-4 text-xs text-gray-500 mb-4">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-blue-200 border border-blue-400 inline-block"></span> Compra web
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-green-200 border border-green-400 inline-block"></span> Venta directa
+            </span>
+          </div>
+
+          {cargando && <p className="text-gray-500">Cargando...</p>}
+          {error && <p className="text-red-600">{error}</p>}
+
+          {!cargando && filas.length === 0 && (
+            <p className="text-gray-500">Aún no hay ventas registradas.</p>
+          )}
+
+          {filas.length > 0 && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-300 rounded-lg overflow-hidden">
+                  <thead className="bg-gray-800 text-white text-left">
+                    <tr>
+                      <th className="p-2">Fecha</th>
+                      <th className="p-2">Hora</th>
+                      <th className="p-2">Origen</th>
+                      <th className="p-2">Cliente</th>
+                      <th className="p-2">Método</th>
+                      <th className="p-2">Código</th>
+                      <th className="p-2">Producto(s)</th>
+                      <th className="p-2">Cant.</th>
+                      <th className="p-2">Descuento</th>
+                      <th className="p-2">Subtotal</th>
+                      <th className="p-2">Acción</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filas.map((f, i) => (
+                      <tr
+                        key={i}
+                        className={`border-t border-gray-300 align-top border-l-4 font-medium ${
+                          f.origen === ORIGEN_WEB ? "bg-blue-200 border-l-blue-700" : "bg-green-200 border-l-green-700"
+                        }`}
+                      >
+                        <td className="p-2">{formatearFecha(f.fecha)}</td>
+                        <td className="p-2">{formatearHora(f.fecha)}</td>
+                        <td className="p-2">{f.origen}</td>
+                        <td className="p-2">{f.cliente}</td>
+                        <td className="p-2">{f.metodo}</td>
+                        <td className="p-2">{f.codigo}</td>
+                        <td className="p-2">{f.nombre}</td>
+                        <td className="p-2">{f.cantidad}</td>
+                        <td className="p-2">
+                          {f.descuento > 0 ? (
+                            <span className="text-red-700">- S/ {f.descuento}</span>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="p-2 font-bold">S/ {f.subtotal}</td>
+                        <td className="p-2">
+                          <button
+                            onClick={() =>
+                              f.tipo === "venta"
+                                ? manejarEliminarVenta(f.id, f.nombre)
+                                : manejarEliminarReserva(f.id, f.nombre)
+                            }
+                            disabled={eliminandoId === f.id}
+                            className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition disabled:opacity-50"
+                          >
+                            {eliminandoId === f.id ? "..." : "Eliminar"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            <div className="mt-4 text-right">
-              <span className="text-lg font-bold">Total vendido: S/ {totalGeneral}</span>
-            </div>
-          </>
-        )}
-      </div>
+              <div className="mt-4 text-right">
+                <span className="text-lg font-bold">Total vendido: S/ {totalGeneral}</span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {modalAbierto && (
@@ -551,38 +500,61 @@ export default function VentasPage() {
           onClick={cerrarModal}
         >
           <div
-            className="bg-white rounded-lg max-w-sm w-full p-6"
+            className="bg-white text-gray-900 rounded-lg max-w-sm w-full p-6 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold mb-4">Agregar venta</h2>
+            <h2 className="text-lg font-bold mb-1">Agregar venta directa</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Para ventas que cerraste por WhatsApp, Instagram o en persona. Descuenta el stock automáticamente.
+            </p>
 
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                placeholder="Numero del par (ej: 1)"
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-2 flex-1"
-              />
-              <button
-                onClick={buscarPorCodigo}
-                disabled={buscando}
-                className="bg-gray-800 text-white px-3 py-2 rounded text-sm hover:bg-gray-900 transition disabled:opacity-50"
-              >
-                {buscando ? "..." : "Buscar"}
-              </button>
-            </div>
+            {!productoElegido && (
+              <>
+                <input
+                  type="text"
+                  placeholder="Buscar tejido por nombre o código"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="border border-gray-300 rounded px-3 py-2 w-full mb-3"
+                  autoFocus
+                />
+                <div className="flex flex-col gap-2">
+                  {resultadosBusqueda.map((p) => (
+                    <button
+                      key={p._id}
+                      onClick={() => elegirProducto(p)}
+                      className="flex items-center gap-3 border border-gray-200 rounded p-2 text-left hover:bg-gray-50"
+                    >
+                      <div className="w-10 h-10 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                        {p.imagenes?.[0] && (
+                          <img src={p.imagenes[0]} alt={p.nombre} className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{p.nombre}</p>
+                        <p className="text-xs text-gray-500">
+                          {p.codigo ? `#${p.codigo} - ` : ""}S/ {p.precio}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                  {termino && resultadosBusqueda.length === 0 && (
+                    <p className="text-sm text-gray-500">No se encontró ningún tejido.</p>
+                  )}
+                </div>
+              </>
+            )}
 
-            {errorModal && <p className="text-red-600 text-sm mb-3">{errorModal}</p>}
+            {errorModal && <p className="text-red-600 text-sm mt-3">{errorModal}</p>}
 
-            {productoEncontrado && (
+            {productoElegido && (
               <div className="border border-gray-200 rounded p-3 mb-3">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-14 h-14 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                    {productoEncontrado.imagenes?.[0] ? (
+                    {productoElegido.imagenes?.[0] ? (
                       <img
-                        src={productoEncontrado.imagenes[0]}
-                        alt={productoEncontrado.nombre}
+                        src={productoElegido.imagenes[0]}
+                        alt={productoElegido.nombre}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -591,15 +563,21 @@ export default function VentasPage() {
                       </div>
                     )}
                   </div>
-                  <div>
-                    <p className="font-semibold text-sm">{productoEncontrado.nombre}</p>
-                    <p className="text-xs text-gray-500">{productoEncontrado.marca} - S/ {productoEncontrado.precio}</p>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">{productoElegido.nombre}</p>
+                    <p className="text-xs text-gray-500">S/ {productoElegido.precio}</p>
                   </div>
+                  <button
+                    onClick={() => setProductoElegido(null)}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Cambiar
+                  </button>
                 </div>
 
-                <p className="text-xs font-semibold mb-1">Talla</p>
+                <p className="text-xs font-semibold mb-1">Tamaño</p>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {productoEncontrado.tallas
+                  {productoElegido.tallas
                     .filter((t) => t.stock > 0)
                     .map((t) => (
                       <button
@@ -612,6 +590,9 @@ export default function VentasPage() {
                         {t.talla} (stock {t.stock})
                       </button>
                     ))}
+                  {productoElegido.tallas.filter((t) => t.stock > 0).length === 0 && (
+                    <p className="text-xs text-gray-500">Este tejido no tiene stock. Edita el producto para agregarlo.</p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 mb-3">
@@ -626,11 +607,11 @@ export default function VentasPage() {
                 </div>
 
                 <div className="mb-3">
-                  <p className="text-xs font-semibold mb-1">Descuento (opcional)</p>
+                  <p className="text-xs font-semibold mb-1">Descuento en S/ (opcional)</p>
                   <input
                     type="number"
                     min="0"
-                    placeholder="Ej: 1, 2, 5..."
+                    placeholder="Ej: 5, 10..."
                     value={descuento}
                     onChange={(e) => setDescuento(e.target.value)}
                     className="border border-gray-300 rounded px-2 py-1 w-full text-sm"

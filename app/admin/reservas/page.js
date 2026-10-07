@@ -19,16 +19,11 @@ const nombreMetodo = {
   plin: "Plin",
 };
 
-const nombreSucursal = {
-  sucursal1: "Sucursal 1",
-  sucursal2: "Sucursal 2",
-};
-
 const filtros = [
   { valor: "todos", etiqueta: "Todos" },
   { valor: "pendiente", etiqueta: "Pendiente" },
   { valor: "atendido", etiqueta: "Atendido" },
-  { valor: "listo_recoger", etiqueta: "Listo para recoger" },
+  { valor: "listo_recoger", etiqueta: "Listo para entrega" },
   { valor: "suspendido", etiqueta: "Suspendido" },
 ];
 
@@ -38,7 +33,6 @@ export default function AdminComprasPage() {
   const [error, setError] = useState("");
   const [, forzarRender] = useState(0);
   const [filtroEstado, setFiltroEstado] = useState("todos");
-  const [filtroSucursal, setFiltroSucursal] = useState("todas");
   const [avisoNueva, setAvisoNueva] = useState(null);
   const [pausado, setPausado] = useState(false);
 
@@ -148,13 +142,12 @@ export default function AdminComprasPage() {
   const etiquetaEstado = {
     pendiente: "pendiente",
     atendido: "atendido",
-    listo_recoger: "listo para recoger",
+    listo_recoger: "listo para entrega",
     suspendido: "suspendido",
   };
 
   const reservasFiltradas = reservas.filter((r) => {
     if (filtroEstado !== "todos" && r.estado !== filtroEstado) return false;
-    if (filtroSucursal !== "todas" && !r.items.some((i) => i.sucursal === filtroSucursal)) return false;
     return true;
   });
 
@@ -215,27 +208,15 @@ export default function AdminComprasPage() {
             ))}
           </div>
 
-          <div className="mb-4">
-            <select
-              value={filtroSucursal}
-              onChange={(e) => setFiltroSucursal(e.target.value)}
-              className="text-sm border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
-            >
-              <option value="todas">Todas las sucursales</option>
-              <option value="sucursal1">Sucursal 1</option>
-              <option value="sucursal2">Sucursal 2</option>
-            </select>
-          </div>
-
           <div className="flex gap-4 text-xs text-gray-500 mb-4 flex-wrap">
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span> Nueva (menos de 1h)
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-orange-500 inline-block"></span> Mas de 1h sin atender
+              <span className="w-3 h-3 rounded-full bg-orange-500 inline-block"></span> Más de 1h sin atender
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Mas de 3h sin atender
+              <span className="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Más de 3h sin atender
             </span>
           </div>
 
@@ -272,10 +253,10 @@ export default function AdminComprasPage() {
                   <p><span className="font-semibold">Celular:</span> {reserva.cliente.celular}</p>
                   <p>
                     <span className="font-semibold">Ciudad:</span>{" "}
-                    {reserva.cliente.ciudad === "andahuaylas" ? "Andahuaylas" : "Fuera de Andahuaylas"}
+                    {reserva.cliente.ciudad === "ica" ? "Ica" : "Fuera de Ica (Shalom)"}
                   </p>
                   {reserva.cliente.entregaDomicilio && (
-                    <p><span className="font-semibold">Direccion:</span> {reserva.cliente.direccion}</p>
+                    <p><span className="font-semibold">Dirección:</span> {reserva.cliente.direccion}</p>
                   )}
                 </div>
 
@@ -300,11 +281,8 @@ export default function AdminComprasPage() {
                         <div className="text-sm flex-1">
                           <p className="font-semibold text-blue-700 hover:underline">{item.nombre}</p>
                           <p className="text-gray-500">
-                            {item.cantidad}x - Talla {item.talla} - S/ {item.precioUnitario}
+                            {item.cantidad}x - Tamaño {item.talla} - S/ {item.precioUnitario}
                             {item.tieneOferta && <span className="text-red-600 font-semibold"> (Oferta)</span>}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {nombreSucursal[item.sucursal] || "Sucursal 1"}
                           </p>
                         </div>
                       </Link>
@@ -325,7 +303,7 @@ export default function AdminComprasPage() {
 
                 <p className="font-bold text-gray-900">Total: S/ {reserva.total}</p>
                 {reserva.requierePagoCompleto && (
-                  <p className="text-red-600 text-xs font-semibold mb-3">Requiere pago completo (producto en oferta)</p>
+                  <p className="text-red-600 text-xs font-semibold mb-3">Requiere pago completo (oferta o envío fuera de Ica)</p>
                 )}
 
                 <div className="flex gap-2 mt-3 flex-wrap">
@@ -339,7 +317,7 @@ export default function AdminComprasPage() {
                     onClick={() => cambiarEstado(reserva._id, "listo_recoger")}
                     className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition"
                   >
-                    Listo para recoger
+                    Listo para entrega
                   </button>
                   <button
                     onClick={() => cambiarEstado(reserva._id, "entregado")}

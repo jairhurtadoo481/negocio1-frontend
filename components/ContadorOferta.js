@@ -29,16 +29,16 @@ export default function ContadorOferta({ ofertaFin }) {
 
   if (!tiempo) {
     return (
-      <p className="text-sm text-gray-500 mt-1">La oferta ha finalizado.</p>
+      <p className="text-sm text-macu-cream/60 mt-1">La oferta ha finalizado.</p>
     );
   }
 
   return (
     <div className="flex items-center gap-2 mt-2">
-      <span className="bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded">
+      <span className="bg-macu-gold text-macu-navy-dark text-xs font-bold px-2 py-1 rounded-full">
         OFERTA
       </span>
-      <span className="text-sm text-gray-700">
+      <span className="text-sm text-macu-cream/80">
         Termina en {tiempo.dias}d {tiempo.horas}h {tiempo.minutos}m {tiempo.segundos}s
       </span>
     </div>

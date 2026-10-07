@@ -15,7 +15,7 @@ export default function CarritoIndicador() {
     return () => window.removeEventListener("carritoActualizado", actualizar);
   }, []);
   return (
-    <Link href="/carrito" className="relative flex items-center text-white hover:text-gray-300 transition">
+    <Link href="/carrito" className="relative flex items-center text-macu-cream hover:text-macu-gold transition">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="24"
@@ -32,7 +32,7 @@ export default function CarritoIndicador() {
         <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
       </svg>
       {cantidad > 0 && (
-        <span className="absolute -top-2 -right-3 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+        <span className="absolute -top-2 -right-3 bg-macu-gold text-macu-navy-dark font-bold text-xs rounded-full w-5 h-5 flex items-center justify-center">
           {cantidad}
         </span>
       )}

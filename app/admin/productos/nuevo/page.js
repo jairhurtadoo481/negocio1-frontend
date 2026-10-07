@@ -3,46 +3,36 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtegerAdmin from "../../../../components/ProtegerAdmin";
-import { crearProducto, subirImagenesProducto } from "../../../../lib/api";
+import { crearProducto, subirImagenesProducto, subirVideosProducto } from "../../../../lib/api";
 import { obtenerToken } from "../../../../lib/auth";
-
-const marcas = [
-  "Joma",
-  "Nike",
-  "Adidas",
-  "Puma",
-  "Lacoste",
-  "Punto Original",
-  "CRforward",
-  "VD-Dariems",
-  "New Athletic",
-  "Michelin",
-  "Underarmour",
-  "Nacionales (Marcelo)",
-  "Ni Air Running",
-];
-
-const MARCA_CON_REPLICA = "Nacionales (Marcelo)";
+import { CATEGORIAS } from "../../../../lib/categorias";
 
 const claseInput = "border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 placeholder-gray-400";
 
+const MAX_VIDEOS = 3;
+const MAX_VIDEO_MB = 50;
+
+const formatearTamano = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+const formVacio = {
+  codigo: "",
+  nombre: "",
+  modeloBase: "",
+  descripcion: "",
+  precio: "",
+  categoria: CATEGORIAS[0].slug,
+  colores: "",
+  personalizable: false,
+  destacado: false,
+};
+
 export default function NuevoProductoPage() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    codigo: "",
-    sucursal: "sucursal1",
-    nombre: "",
-    modeloBase: "",
-    marca: "Nike",
-    calidad: "Original",
-    descripcion: "",
-    precio: "",
-    categoria: "hombre",
-    tipo: "casual",
-    colores: "",
-  });
+  const [form, setForm] = useState(formVacio);
   const [tallas, setTallas] = useState([{ talla: "", stock: "" }]);
   const [imagenes, setImagenes] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [etapa, setEtapa] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
@@ -53,36 +43,26 @@ export default function NuevoProductoPage() {
       const data = JSON.parse(duplicado);
       setForm({
         codigo: data.codigo || "",
-        sucursal: data.sucursal || "sucursal1",
         nombre: data.nombre || "",
         modeloBase: data.modeloBase || "",
-        marca: data.marca || "Nike",
-        calidad: data.marca === MARCA_CON_REPLICA ? (data.calidad || "Original") : "Original",
         descripcion: data.descripcion || "",
         precio: data.precio || "",
-        categoria: data.categoria || "hombre",
-        tipo: data.tipo || "casual",
+        categoria: data.categoria || CATEGORIAS[0].slug,
         colores: data.colores || "",
+        personalizable: data.personalizable === true,
+        destacado: false,
       });
       if (data.tallas && data.tallas.length > 0) {
         setTallas(data.tallas.map((t) => ({ talla: t.talla, stock: String(t.stock) })));
       }
-      setMensaje("Datos copiados de otro producto. Revisa el codigo, imagenes y tallas antes de guardar.");
+      setMensaje("Datos copiados de otro producto. Revisa el código, las imágenes y los tamaños antes de guardar.");
       sessionStorage.removeItem("productoDuplicar");
     }
   }, []);
 
   const manejarCambio = (e) => {
-    const { name, value } = e.target;
-    if (name === "marca") {
-      setForm({
-        ...form,
-        marca: value,
-        calidad: value === MARCA_CON_REPLICA ? form.calidad : "Original",
-      });
-      return;
-    }
-    setForm({ ...form, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
   };
 
   const manejarCambioTalla = (index, campo, valor) => {
@@ -97,6 +77,28 @@ export default function NuevoProductoPage() {
 
   const quitarTalla = (index) => {
     setTallas(tallas.filter((_, i) => i !== index));
+  };
+
+  const manejarVideos = (e) => {
+    const elegidos = Array.from(e.target.files);
+    setError("");
+
+    if (elegidos.length > MAX_VIDEOS) {
+      setError(`Puedes subir hasta ${MAX_VIDEOS} videos por producto.`);
+      e.target.value = "";
+      setVideos([]);
+      return;
+    }
+
+    const muyPesado = elegidos.find((v) => v.size > MAX_VIDEO_MB * 1024 * 1024);
+    if (muyPesado) {
+      setError(`"${muyPesado.name}" pesa ${formatearTamano(muyPesado.size)}. Cada video puede pesar hasta ${MAX_VIDEO_MB} MB.`);
+      e.target.value = "";
+      setVideos([]);
+      return;
+    }
+
+    setVideos(elegidos);
   };
 
   const manejarSubmit = async (e) => {
@@ -114,15 +116,13 @@ export default function NuevoProductoPage() {
 
       const payload = {
         codigo: form.codigo.trim(),
-        sucursal: form.sucursal,
         nombre: form.nombre,
         modeloBase: form.modeloBase.trim(),
-        marca: form.marca,
-        calidad: form.marca === MARCA_CON_REPLICA ? form.calidad : "Original",
         descripcion: form.descripcion,
         precio: Number(form.precio),
         categoria: form.categoria,
-        tipo: form.tipo,
+        personalizable: form.personalizable,
+        destacado: form.destacado,
         colores: form.colores
           .split(",")
           .map((c) => c.trim())
@@ -133,29 +133,25 @@ export default function NuevoProductoPage() {
       const productoCreado = await crearProducto(token, payload);
 
       if (imagenes.length > 0) {
+        setEtapa("Subiendo imágenes...");
         await subirImagenesProducto(token, productoCreado._id, imagenes);
       }
 
+      if (videos.length > 0) {
+        setEtapa("Subiendo videos (puede tardar un poco)...");
+        await subirVideosProducto(token, productoCreado._id, videos);
+      }
+
       setMensaje("Producto creado correctamente");
-      setForm({
-        codigo: "",
-        sucursal: "sucursal1",
-        nombre: "",
-        modeloBase: "",
-        marca: "Nike",
-        calidad: "Original",
-        descripcion: "",
-        precio: "",
-        categoria: "hombre",
-        tipo: "casual",
-        colores: "",
-      });
+      setForm(formVacio);
       setTallas([{ talla: "", stock: "" }]);
       setImagenes([]);
+      setVideos([]);
       e.target.reset();
     } catch (err) {
       setError(err.message);
     } finally {
+      setEtapa("");
       setCargando(false);
     }
   };
@@ -175,33 +171,20 @@ export default function NuevoProductoPage() {
           </div>
 
           <form onSubmit={manejarSubmit} className="flex flex-col gap-4">
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <input
-                  name="codigo"
-                  placeholder="Codigo / numero del par (ej: 1, 2, 3...)"
-                  value={form.codigo}
-                  onChange={manejarCambio}
-                  className={`${claseInput} w-full`}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  El mismo numero que pegaste en la nota fisica del par.
-                </p>
-              </div>
-              <select
-                name="sucursal"
-                value={form.sucursal}
+            <div>
+              <input
+                name="codigo"
+                placeholder="Código (opcional)"
+                value={form.codigo}
                 onChange={manejarCambio}
-                className={claseInput}
-              >
-                <option value="sucursal1">Sucursal 1</option>
-                <option value="sucursal2">Sucursal 2</option>
-              </select>
+                className={`${claseInput} w-full`}
+              />
+              <p className="text-xs text-gray-400 mt-1">Un número o código propio para ubicar el tejido.</p>
             </div>
 
             <input
               name="nombre"
-              placeholder="Nombre"
+              placeholder="Nombre (ej: Ramo Spiderman)"
               value={form.nombre}
               onChange={manejarCambio}
               className={claseInput}
@@ -211,50 +194,19 @@ export default function NuevoProductoPage() {
             <div>
               <input
                 name="modeloBase"
-                placeholder="Modelo base (ej: Air Max 90) - opcional, para agrupar variantes"
+                placeholder="Modelo base (opcional, para agrupar versiones)"
                 value={form.modeloBase}
                 onChange={manejarCambio}
                 className={`${claseInput} w-full`}
               />
               <p className="text-xs text-gray-400 mt-1">
-                Si varios productos comparten el mismo texto aqui, apareceran como variantes entre si.
+                Si varios productos comparten el mismo texto aquí, aparecerán como versiones entre sí.
               </p>
             </div>
-
-            <div className="flex gap-3">
-              <select
-                name="marca"
-                value={form.marca}
-                onChange={manejarCambio}
-                className={`${claseInput} flex-1`}
-                required
-              >
-                {marcas.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-
-              <select
-                name="calidad"
-                value={form.calidad}
-                onChange={manejarCambio}
-                disabled={form.marca !== MARCA_CON_REPLICA}
-                className={`${claseInput} flex-1 ${form.marca !== MARCA_CON_REPLICA ? "opacity-50 cursor-not-allowed" : ""}`}
-                required
-              >
-                <option value="Original">Original</option>
-                <option value="Replica">Replica</option>
-              </select>
-            </div>
-            {form.marca !== MARCA_CON_REPLICA && (
-              <p className="text-xs text-gray-400 -mt-2">
-                Solo los productos de "Nacionales (Marcelo)" pueden marcarse como Replica.
-              </p>
-            )}
 
             <textarea
               name="descripcion"
-              placeholder="Descripcion"
+              placeholder="Descripción (qué incluye: caja, tarjeta, fotos...)"
               value={form.descripcion}
               onChange={manejarCambio}
               className={claseInput}
@@ -263,37 +215,45 @@ export default function NuevoProductoPage() {
             <input
               name="precio"
               type="number"
-              placeholder="Precio"
+              placeholder="Precio (S/)"
               value={form.precio}
               onChange={manejarCambio}
               className={claseInput}
               required
             />
 
-            <div className="flex gap-4">
-              <select
-                name="categoria"
-                value={form.categoria}
-                onChange={manejarCambio}
-                className={`${claseInput} flex-1`}
-              >
-                <option value="hombre">Hombre</option>
-                <option value="mujer">Mujer</option>
-                <option value="ninios">{"Ni\u00f1os"}</option>
-              </select>
+            <select
+              name="categoria"
+              value={form.categoria}
+              onChange={manejarCambio}
+              className={claseInput}
+            >
+              {CATEGORIAS.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
 
-              <select
-                name="tipo"
-                value={form.tipo}
-                onChange={manejarCambio}
-                className={`${claseInput} flex-1`}
-              >
-                <option value="running">Running</option>
-                <option value="urbano">Urbano</option>
-                <option value="casual">Casual</option>
-                <option value="deportivo">Deportivo</option>
-                <option value="botines">Botines</option>
-              </select>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm text-gray-900">
+                <input
+                  type="checkbox"
+                  name="personalizable"
+                  checked={form.personalizable}
+                  onChange={manejarCambio}
+                />
+                Se puede personalizar
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-900">
+                <input
+                  type="checkbox"
+                  name="destacado"
+                  checked={form.destacado}
+                  onChange={manejarCambio}
+                />
+                Mostrar en Destacados del inicio
+              </label>
             </div>
 
             <input
@@ -305,11 +265,14 @@ export default function NuevoProductoPage() {
             />
 
             <div>
-              <p className="font-semibold mb-2 text-gray-900">Tallas y stock</p>
+              <p className="font-semibold mb-1 text-gray-900">Tamaños y stock</p>
+              <p className="text-xs text-gray-400 mb-2">
+                Si lo tejes por encargo, pon una cantidad alta (ej. 99) para que siempre se pueda pedir.
+              </p>
               {tallas.map((t, index) => (
                 <div key={index} className="flex gap-2 mb-2">
                   <input
-                    placeholder="Talla (ej: 40)"
+                    placeholder="Tamaño (ej: 15cm)"
                     value={t.talla}
                     onChange={(e) => manejarCambioTalla(index, "talla", e.target.value)}
                     className={`${claseInput} flex-1`}
@@ -337,12 +300,12 @@ export default function NuevoProductoPage() {
                 onClick={agregarTalla}
                 className="text-sm text-blue-600 hover:underline"
               >
-                + Agregar talla
+                + Agregar tamaño
               </button>
             </div>
 
             <div>
-              <p className="font-semibold mb-2 text-gray-900">Imagenes</p>
+              <p className="font-semibold mb-2 text-gray-900">Imágenes</p>
               <input
                 type="file"
                 accept="image/*"
@@ -357,6 +320,29 @@ export default function NuevoProductoPage() {
               )}
             </div>
 
+            <div>
+              <p className="font-semibold mb-1 text-gray-900">Videos (opcional)</p>
+              <p className="text-xs text-gray-400 mb-2">
+                Hasta {MAX_VIDEOS} videos de {MAX_VIDEO_MB} MB cada uno. Se verán en la página del producto.
+              </p>
+              <input
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={manejarVideos}
+                className={`${claseInput} w-full`}
+              />
+              {videos.length > 0 && (
+                <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                  {videos.map((v) => (
+                    <li key={v.name}>
+                      {v.name} ({formatearTamano(v.size)})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {mensaje && <p className="text-green-600 text-sm">{mensaje}</p>}
             {error && <p className="text-red-600 text-sm">{error}</p>}
 
@@ -365,7 +351,7 @@ export default function NuevoProductoPage() {
               disabled={cargando}
               className="bg-black text-white rounded py-2 font-semibold hover:bg-gray-800 transition disabled:opacity-50"
             >
-              {cargando ? "Creando..." : "Crear producto"}
+              {cargando ? etapa || "Creando..." : "Crear producto"}
             </button>
           </form>
         </div>

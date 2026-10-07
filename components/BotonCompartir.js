@@ -12,7 +12,7 @@ export default function BotonCompartir({ producto }) {
       try {
         await navigator.share({
           title: producto.nombre,
-          text: `Mira esta zapatilla: ${producto.nombre} - ${producto.marca}`,
+          text: `Mira este tejido de Tejidos Macu: ${producto.nombre}`,
           url,
         });
       } catch (e) {
@@ -28,9 +28,9 @@ export default function BotonCompartir({ producto }) {
   return (
     <button
       onClick={compartir}
-      className="flex items-center justify-center gap-2 border border-gray-300 rounded py-2 font-semibold hover:bg-gray-50 transition mt-2 w-full"
+      className="flex items-center justify-center gap-2 border border-macu-cream/50 text-macu-cream rounded-full py-2 font-semibold hover:bg-macu-cream hover:text-macu-navy-dark transition mt-2 w-full"
     >
-      {copiado ? "Link copiado!" : "Compartir"}
+      {copiado ? "¡Link copiado!" : "Compartir"}
     </button>
   );
 }

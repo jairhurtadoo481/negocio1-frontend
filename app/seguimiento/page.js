@@ -12,9 +12,9 @@ const colorEstado = {
 };
 
 const etiquetaEstado = {
-  pendiente: "Pendiente de confirmacion",
+  pendiente: "Pendiente de confirmación",
   atendido: "En proceso",
-  listo_recoger: "Listo para recoger",
+  listo_recoger: "Listo para entrega",
   entregado: "Entregado",
   suspendido: "Suspendido",
 };
@@ -45,14 +45,14 @@ export default function SeguimientoPage() {
   };
 
   return (
-    <div className="bg-white min-h-screen">
-      <div className="max-w-md mx-auto px-4 py-10">
+    <div className="min-h-screen px-4">
+      <div className="max-w-md mx-auto my-10 px-6 py-8 bg-white rounded-2xl shadow-xl">
         <h1 className="text-2xl font-bold mb-6 text-gray-900">Estado de mi pedido</h1>
 
         <form onSubmit={buscar} className="flex flex-col gap-4 mb-6">
           <input
             type="text"
-            placeholder="Numero de pedido (ej: 1001)"
+            placeholder="Número de pedido (ej: 1001)"
             value={numero}
             onChange={(e) => setNumero(e.target.value)}
             className={claseInput}
@@ -60,7 +60,7 @@ export default function SeguimientoPage() {
           />
           <input
             type="text"
-            placeholder="Numero de celular"
+            placeholder="Número de celular"
             value={celular}
             onChange={(e) => setCelular(e.target.value)}
             className={claseInput}
@@ -69,7 +69,7 @@ export default function SeguimientoPage() {
           <button
             type="submit"
             disabled={buscando}
-            className="bg-black text-white rounded py-2 font-semibold hover:bg-gray-800 transition disabled:opacity-50"
+            className="bg-macu-navy text-macu-cream rounded py-2 font-semibold hover:bg-macu-navy-light transition disabled:opacity-50"
           >
             {buscando ? "Buscando..." : "Ver estado"}
           </button>
@@ -88,16 +88,10 @@ export default function SeguimientoPage() {
 
             <p className="text-gray-700 mb-3">{resultado.mensaje}</p>
 
-            {resultado.estado === "listo_recoger" && resultado.sucursales.length > 0 && (
-              <p className="text-sm mb-3 text-gray-900">
-                <span className="font-semibold">Recoger en:</span> {resultado.sucursales.join(", ")}
-              </p>
-            )}
-
             <div className="text-sm text-gray-500 mb-2">
               {resultado.items.map((item, i) => (
                 <p key={i}>
-                  {item.cantidad}x {item.nombre} - Talla {item.talla}
+                  {item.cantidad}x {item.nombre} - Tamaño {item.talla}
                 </p>
               ))}
             </div>

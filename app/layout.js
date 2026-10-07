@@ -1,23 +1,20 @@
 import "./globals.css";
-import { Anton, Inter } from "next/font/google";
+import { Playfair_Display, Inter } from "next/font/google";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-const anton = Anton({ weight: "400", subsets: ["latin"], variable: "--font-anton" });
+const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata = {
-  title: "Zapatillas Marcelo",
-  description: "Tienda de zapatillas Zapatillas Marcelo",
-  verification: {
-    google: "5QJLTvzwUwKr-oZ9vk5653HDgSRTukKxxvpsI2W-x_o",
-  },
+  title: "Tejidos Macu",
+  description: "Tejidos a crochet hechos a mano: amigurumis, ramos, flores, llaveros, bolsos y tops. Pedidos personalizados desde Ica.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body className={`${anton.variable} ${inter.variable} bg-gradient-to-b from-gray-900 via-black to-gray-900 text-white`}>
+      <body className={`${playfair.variable} ${inter.variable} bg-gradient-to-b from-macu-navy-dark via-macu-navy to-macu-navy-dark text-macu-cream min-h-screen`}>
         <Navbar />
         <main>{children}</main>
         <Footer />

@@ -45,7 +45,7 @@ export default function HistorialReservasPage() {
         {error && <p className="text-red-600">{error}</p>}
 
         {!cargando && reservas.length === 0 && (
-          <p className="text-gray-500">Aun no hay compras exitosas registradas.</p>
+          <p className="text-gray-500">Aún no hay compras entregadas registradas.</p>
         )}
 
         <div className="flex flex-col gap-4">
@@ -64,7 +64,7 @@ export default function HistorialReservasPage() {
               <div className="text-sm">
                 {reserva.items.map((item, i) => (
                   <p key={i}>
-                    {item.cantidad}x {item.nombre} - Talla {item.talla} - S/ {item.precioUnitario}
+                    {item.cantidad}x {item.nombre} - Tamaño {item.talla} - S/ {item.precioUnitario}
                   </p>
                 ))}
                 <p className="font-bold mt-1">Total: S/ {reserva.total}</p>

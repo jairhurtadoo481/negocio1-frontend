@@ -1,6 +1,7 @@
 import { obtenerProductos } from "../lib/api";
+import { CATEGORIAS } from "../lib/categorias";
 
-const SITE_URL = "https://lacasademarcelo.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export default async function sitemap() {
   const paginasPrincipales = [
@@ -10,30 +11,12 @@ export default async function sitemap() {
       changeFrequency: "daily",
       priority: 1,
     },
-    {
-      url: `${SITE_URL}/hombre`,
+    ...CATEGORIAS.map((c) => ({
+      url: `${SITE_URL}/${c.slug}`,
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/mujer`,
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ninios`,
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ofertas`,
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 0.7,
-    },
+    })),
   ];
 
   let paginasProductos = [];
@@ -41,7 +24,7 @@ export default async function sitemap() {
     const data = await obtenerProductos({ limit: 1000 });
     paginasProductos = (data.productos || []).map((producto) => ({
       url: `${SITE_URL}/producto/${producto._id}`,
-      lastModified: new Date(producto.actualizadoEn || producto.creadoEn || Date.now()),
+      lastModified: new Date(producto.updatedAt || producto.createdAt || Date.now()),
       changeFrequency: "weekly",
       priority: 0.6,
     }));

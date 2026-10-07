@@ -1,17 +1,45 @@
 @import "tailwindcss";
 
+@theme {
+  --color-macu-navy: #273e60;
+  --color-macu-navy-dark: #1a2a45;
+  --color-macu-navy-light: #35527f;
+  --color-macu-gold: #e9b84a;
+  --color-macu-cream: #f6efe4;
+}
+
 :root {
   color-scheme: light;
 }
 
 body {
   font-family: var(--font-inter), sans-serif;
-  background-color: #ffffff;
-  color: #111827;
+  background-color: #1a2a45;
+  color: #f6efe4;
 }
 
 .font-display {
-  font-family: var(--font-anton), sans-serif;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+}
+
+.sombra-texto :is(h1, h2, h3, p, li, span):not(a *) {
+  text-shadow: 0 1px 12px rgba(10, 20, 40, 0.7);
+}
+
+.fondo-nitido {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (orientation: landscape) {
+  .fondo-nitido {
+    width: auto;
+    object-fit: contain;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  }
 }
 
 @keyframes marquesina {
